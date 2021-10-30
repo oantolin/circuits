@@ -1,0 +1,15 @@
+This is very simple-minded dynamic programming code to find minimal
+circuits for all boolean functions of n variables. Only use it for
+n<=3. :P
+
+To generate a file of minimal circuits just run =(save-mincircuits n)=
+and the file =mincircuits#.txt= will be produced with =#= replaced by =n=.
+If you try a /huge/ value of =n=, say 4 or more, then you may want to ad
+an optional maximal circuit complexity to bound the search. In that
+case use =(save-mincircuits n :complexity bound)=.
+
+The search procedure is fairly general. If you want to use different
+logic gates, take a look at the code for =mincircuits= and see how the
+=and=, =or= and =not= gates are implemented. It is easy to modify that
+function to use your preferred gates or, for example, to add constant
+1 and constant 0 wires.
