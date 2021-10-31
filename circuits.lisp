@@ -103,4 +103,38 @@ no circuit was found. By default, these functions are silently omitted."
           (if (null me)
               (when verbose
                 (format out "~%~v,'0b no circuit found" (ash 1 n) k))
-              (format out "~%~v,'0b [~2d] ~a" (ash 1 n) k (car me) (cdr me))))))))
+              (format out "~%~v,'0b [~2d] ~a"
+                      (ash 1 n) k (car me) (cdr me))))))))
+
+(defun empty-stats (n circuits)
+  "Compare circuits for boolean functions that differ only on 00...0.
+
+N is the number of variables of the boolean functions.
+
+CIRCUITS is hash-table mapping functions to pairs whose cdr is an
+optimal circuit for the function and whose car is the complexity of
+said function."
+  (loop with total = (ash 1 (1- (ash 1 n)))
+        for e below total
+        for c0 = (car (gethash (* 2 e) circuits))
+        for c1 = (car (gethash (1+ (* 2 e)) circuits))
+        count (< c0 c1) into win0
+        count (= c0 c1) into ties
+        count (> c0 c1) into win1
+        if (< c0 c1)
+          sum (- c1 c0) into diff0
+        else
+          sum (- c0 c1) into diff1
+        finally
+           (format t "Which value of f(00...0) gives simpler circuits?
+0 is simpler: ~,2f% (~d)~%1 is simpler: ~,2f% (~d)
+No difference: ~,2f% (~d)~%
+Average complexity savings:
+When 0 is simpler: ~,2f~%When 1 is simpler: ~,2f
+Total (includes ties): ~,2f"
+                   (* 100 (/ win0 total)) win0
+                   (* 100 (/ win1 total)) win1
+                   (* 100 (/ ties total)) ties
+                   (/ diff0 win0)
+                   (/ diff1 win1)
+                   (/ (+ diff0 diff1) total))))
