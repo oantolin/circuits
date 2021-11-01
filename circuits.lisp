@@ -18,7 +18,7 @@
             (car lists))))
 
 (defun minexprs (ops atoms &key goal complexity)
-  "Find minimal expressions for given values in terms of OPS and ATOMS.
+  "Find all minimal expressions for given values in terms of OPS and ATOMS.
 
 OPS should be a list of 3-element lists of the form (name func arity).
 If func returns nil for some arguments, that means the operation is
@@ -38,8 +38,10 @@ the maximum COMPLEXITY is reached.
 
 At least one of GOAL and COMPLEXITY should be given.
 
-The return value is a hash-table mapping values to a minimal
-complexity expression that produces the value."
+The return value is a hash-table mapping values to a list whose first
+element is the minimal complexity of expression that produces the
+value, and whose tail is the list of all expressions of that minimum
+complexity."
   (let ((values (make-array 2 :initial-element nil
                               :fill-pointer 2 :adjustable t))
         ;; values[i] holds an alist of (value . expr) pairs of complexity i
@@ -58,11 +60,14 @@ complexity expression that produces the value."
         (destructuring-bind (name func arity) op
           (dolist (ix (sum-to (1- cx) (1- cx) arity))
             (mapcart (lambda (args)
-                       (let ((val (apply func (mapcar #'car args))))
-                         (unless (gethash val minexpr)
+                       (let* ((val (apply func (mapcar #'car args)))
+                              (seen (gethash val minexpr)))
+                         (when (or (not seen) (= (car seen) cx))
                            (let ((expr (cons name (mapcar #'cdr args))))
-                             (incf found)
-                             (setf (gethash val minexpr) (cons cx expr))
+                             (unless seen
+                               (incf found)
+                               (push cx (gethash val minexpr)))
+                             (push expr (cdr (gethash val minexpr)))
                              (push (cons val expr) (aref values cx))))))
                      (mapcar (lambda (i) (aref values i)) ix))))))))
 
