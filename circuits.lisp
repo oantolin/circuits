@@ -50,7 +50,7 @@ complexity."
     (dolist (nv atoms) ; nv is a (name value) list
       (incf found)
       (push (cons (cadr nv) (car nv)) (aref values 1))
-      (setf (gethash (cadr nv) minexpr) (cons 1 (car nv))))
+      (setf (gethash (cadr nv) minexpr) (list 1 (car nv))))
     (do ((cx 2 (1+ cx)))
         ((or (and goal (>= found goal))
              (and complexity (> cx complexity)))
