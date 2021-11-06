@@ -21,7 +21,8 @@
   "Find all minimal expressions for given values in terms of OPS and ATOMS.
 
 OPS should be a list of 4-element lists of the following form:
-  (name func min-arity max-arity).
+(name func min-arity max-arity). The max-arity can be the symbol
+:infinity.
 
 If func returns nil for some arguments, that means the operation is
 not applicable to those arguments and should be skipped. For example
@@ -60,7 +61,8 @@ complexity."
       (vector-push-extend nil values)
       (dolist (op ops)
         (destructuring-bind (name func min-arity max-arity) op
-          (dotimes (i (1+ (- max-arity min-arity)))
+          (dotimes (i (1+ (- (if (eq max-arity :infinity) (1- cx) max-arity)
+                             min-arity)))
             (let ((arity (+ i min-arity)))
               (dolist (ix (sum-to (1- cx) (1- cx) arity))
                 (mapcart (lambda (args)
@@ -88,8 +90,8 @@ complexity for the search."
              (loop for k below n
                    collect (/ (* (1- (pp n)) (pp k)) (1+ (pp k))))))
       (minexprs
-       `((and ,#'logand 2 2)
-         (or ,#'logior 2 2)
+       `((and ,#'logand 2 :infinity)
+         (or ,#'logior 2 :infinity)
          (not ,(lambda (x) (logand mask (lognot x))) 1 1))
        (mapcar #'list variable-names projections)
        :complexity complexity
