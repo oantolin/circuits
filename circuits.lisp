@@ -20,7 +20,9 @@
 (defun minexprs (ops atoms &key goal complexity)
   "Find all minimal expressions for given values in terms of OPS and ATOMS.
 
-OPS should be a list of 3-element lists of the form (name func arity).
+OPS should be a list of 4-element lists of the following form:
+  (name func min-arity max-arity).
+
 If func returns nil for some arguments, that means the operation is
 not applicable to those arguments and should be skipped. For example
 one might use (lambda (x y) (unless (zerop y) (/ x y))) to avoid
@@ -57,19 +59,21 @@ complexity."
          minexpr)
       (vector-push-extend nil values)
       (dolist (op ops)
-        (destructuring-bind (name func arity) op
-          (dolist (ix (sum-to (1- cx) (1- cx) arity))
-            (mapcart (lambda (args)
-                       (let* ((val (apply func (mapcar #'car args)))
-                              (seen (gethash val minexpr)))
-                         (when (or (not seen) (= (car seen) cx))
-                           (let ((expr (cons name (mapcar #'cdr args))))
-                             (unless seen
-                               (incf found)
-                               (push cx (gethash val minexpr)))
-                             (push expr (cdr (gethash val minexpr)))
-                             (push (cons val expr) (aref values cx))))))
-                     (mapcar (lambda (i) (aref values i)) ix))))))))
+        (destructuring-bind (name func min-arity max-arity) op
+          (dotimes (i (1+ (- max-arity min-arity)))
+            (let ((arity (+ i min-arity)))
+              (dolist (ix (sum-to (1- cx) (1- cx) arity))
+                (mapcart (lambda (args)
+                           (let* ((val (apply func (mapcar #'car args)))
+                                  (seen (gethash val minexpr)))
+                             (when (or (not seen) (= (car seen) cx))
+                               (let ((expr (cons name (mapcar #'cdr args))))
+                                 (unless seen
+                                   (incf found)
+                                   (push cx (gethash val minexpr)))
+                                 (push expr (cdr (gethash val minexpr)))
+                                 (push (cons val expr) (aref values cx))))))
+                         (mapcar (lambda (i) (aref values i)) ix))))))))))
 
 (defun mincircuits (n &key complexity)
   "Find minimal circuits for all N variable boolean functions.
@@ -84,9 +88,9 @@ complexity for the search."
              (loop for k below n
                    collect (/ (* (1- (pp n)) (pp k)) (1+ (pp k))))))
       (minexprs
-       `((and ,#'logand 2)
-         (or ,#'logior 2)
-         (not ,(lambda (x) (logand mask (lognot x))) 1))
+       `((and ,#'logand 2 2)
+         (or ,#'logior 2 2)
+         (not ,(lambda (x) (logand mask (lognot x))) 1 1))
        (mapcar #'list variable-names projections)
        :complexity complexity
        :goal (ash 1 (ash 1 n))))))
