@@ -15,7 +15,8 @@ For example ((3 . 2) (2 . 1)) represents the partition 3+3+2 of 8."
   "Return all susbets of K elements taken from LIST.
 The order of the elements in each subset is the same as in LIST."
   (cond
-    ((zerop k) '(()))
+    ((= k 0) '(()))
+    ((= k 1) (mapcar #'list list))
     ((null list) nil)
     (t (destructuring-bind (x . rest) list
          (append (mapcar (lambda (s) (cons x s)) (subsets (1- k) rest))
@@ -141,6 +142,8 @@ no circuit was found. By default, these functions are silently omitted."
                 (format out "~%~v,'0b no circuit found" (ash 1 n) k))
               (format out "~%~v,'0b [~2d] ~a"
                       (ash 1 n) k (car me) (cdr me))))))))
+
+;;; auxiliary functions for collecting statistics on circuits
 
 (defun empty-stats (n circuits)
   "Compare circuits for boolean functions that differ only on 00...0.
