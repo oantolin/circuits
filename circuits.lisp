@@ -1,12 +1,25 @@
-(defun sum-to (s n k)
-  "Return all K-tuples of integers between 0 and N that sum to S."
-  (if (zerop k)
-      (if (zerop s) '(()) nil)
-      (let (results) 
-        (dotimes (i (1+ (min n s)))
-          (dolist (x (sum-to (- s i) n (1- k)))
-            (push (cons i x) results)))
-        results)))
+(defun partitions (n k m)
+  "Return all partitions of N into K parts, each at most m.
+Each partition is represented as an alist of parts and multiplicities.
+For example ((3 . 2) (2 . 1)) represents the partition 3+3+2 of 8."
+  (cond
+    ((= n k 0) '(()))
+    ((or (= n 0) (= k 0) (= m 0)) nil)
+    (t (let ((results (partitions n k (1- m))))
+         (dotimes (i (min k (floor n m)))
+           (dolist (p (partitions (- n (* (1+ i) m)) (- k i 1) (1- m)))
+             (push (cons (cons m (1+ i)) p) results)))
+         results))))
+
+(defun subsets (k list)
+  "Return all susbets of K elements taken from LIST.
+The order of the elements in each subset is the same as in LIST."
+  (cond
+    ((zerop k) '(()))
+    ((null list) nil)
+    (t (destructuring-bind (x . rest) list
+         (append (mapcar (lambda (s) (cons x s)) (subsets (1- k) rest))
+                 (subsets k rest))))))
 
 (defun mapcart (fn lists)
   "Apply FN to all elements of the cartesion product of LISTS."
@@ -22,12 +35,10 @@
 
 OPS should be a list of 4-element lists of the following form:
 (name func min-arity max-arity). The max-arity can be the symbol
-:infinity.
-
-If func returns nil for some arguments, that means the operation is
-not applicable to those arguments and should be skipped. For example
-one might use (lambda (x y) (unless (zerop y) (/ x y))) to avoid
-division by 0.
+:infinity. The operations are assumed to be commutative and
+idempotent, and thus to reduce repetitions of the expression an
+arbitrary total order is imposed on the expressions and operations are
+only constructed with arguments in increasing order.
 
 ATOMS should be a list of 2-element lists of the form (name value).
 
@@ -64,8 +75,9 @@ complexity."
           (dotimes (i (1+ (- (if (eq max-arity :infinity) (1- cx) max-arity)
                              min-arity)))
             (let ((arity (+ i min-arity)))
-              (dolist (ix (sum-to (1- cx) (1- cx) arity))
+              (dolist (part (partitions (1- cx) arity (1- cx)))
                 (mapcart (lambda (args)
+                           (setf args (reduce #'append args :from-end t))
                            (let* ((val (apply func (mapcar #'car args)))
                                   (seen (gethash val minexpr)))
                              (when (or (not seen) (= (car seen) cx))
@@ -75,13 +87,20 @@ complexity."
                                    (push cx (gethash val minexpr)))
                                  (push expr (cdr (gethash val minexpr)))
                                  (push (cons val expr) (aref values cx))))))
-                         (mapcar (lambda (i) (aref values i)) ix))))))))))
+                         (mapcar (lambda (p)
+                                   (subsets (cdr p) (aref values (car p))))
+                                 part))))))))))
 
-(defun mincircuits (n &key complexity)
+(defun mincircuits (n &key complexity max-arity)
   "Find minimal circuits for all N variable boolean functions.
 
-The optional COMPLEXITY keyword argument specifies a maximum
-complexity for the search."
+The optional COMPLEXITY argument specifies a maximum complexity for
+the search.
+
+The optional MAX-ARITY argument specifies a maximum arity for the AND
+and OR gates. If absent it defaults to N. You can also use the symbol
+:infinity."
+  (unless max-arity (setf max-arity n))
   (flet ((pp (k) (ash 1 (ash 1 k))))
     (let* ((mask (1- (pp n)))
            (variable-names
@@ -90,25 +109,31 @@ complexity for the search."
              (loop for k below n
                    collect (/ (* (1- (pp n)) (pp k)) (1+ (pp k))))))
       (minexprs
-       `((and ,#'logand 2 :infinity)
-         (or ,#'logior 2 :infinity)
+       `((and ,#'logand 2 ,max-arity)
+         (or ,#'logior 2 ,max-arity)
          (not ,(lambda (x) (logand mask (lognot x))) 1 1))
        (mapcar #'list variable-names projections)
        :complexity complexity
        :goal (ash 1 (ash 1 n))))))
 
-(defun save-mincircuits (n &key (file "mincircuits~d.txt") complexity verbose)
+(defun save-mincircuits (n &key (file "mincircuits~d.txt")
+                             complexity max-arity verbose)
   "Save minimal circuits for boolean functions of N variables to FILE.
 
 The FILE can contain a '~d' which will be replaced by N.
 
 The optional COMPLEXITY specifies a maximum complexity for the search.
 
+The optional MAX-ARITY argument specifies a maximum arity for the AND
+and OR gates. If absent it defaults to N. You can also use the symbol
+:infinity.
+  
 If VERBOSE is true, then a message is printed for functions for which
 no circuit was found. By default, these functions are silently omitted."
   (with-open-file (out (format nil file n) :direction :output
                                            :if-exists :supersede)
-    (let ((circuits (mincircuits n :complexity complexity)))
+    (let ((circuits (mincircuits n :complexity complexity
+                                   :max-arity max-arity)))
       (dotimes (k (ash 1 (ash 1 n)))
         (let ((me (gethash k circuits)))
           (if (null me)
@@ -149,3 +174,9 @@ Total (includes ties): ~,2f"
                    (/ diff0 win0)
                    (/ diff1 win1)
                    (/ (+ diff0 diff1) total))))
+
+(defun max-arity (expr)
+  "Return maximum arity of any operation in EXPR."
+  (if (atom expr)
+      0
+      (apply #'max (1- (length expr)) (mapcar #'max-arity (cdr expr)))))
